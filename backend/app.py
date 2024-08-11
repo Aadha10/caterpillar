@@ -1,64 +1,132 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import speech_recognition as sr
 import pyttsx3
+import json
+import time
+from threading import Event
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize the recognizer
 r = sr.Recognizer()
 
-# Function to convert text to speech
+responses = {}
+stop_event = Event()  # Event to signal stop
+
 def SpeakText(command):
     engine = pyttsx3.init()
     engine.say(command)
     engine.runAndWait()
 
-# Function to ask questions and get responses with validation
 def ask_question(question, expected_type=None):
-    while True:
-        SpeakText(question)
-        print(question)
+    global stop_event
+    response_list = []
+
+    # Emit the question to the frontend immediately
+    question_response = json.dumps({"question": question, "response": ""}) + "\n"
+    print("Emitting question:", question_response.strip())
+    yield question_response
+
+    # Speak the question
+    SpeakText(question)
+
+    # Add a short delay to allow the TTS engine to finish
+    time.sleep(1.5)  # Adjust the duration if needed
+
+    while not stop_event.is_set():  # Check if stop event is set
         try:
             with sr.Microphone() as source2:
                 r.adjust_for_ambient_noise(source2, duration=0.2)
                 audio2 = r.listen(source2)
                 response = r.recognize_google(audio2).lower()
-                print("Response:", response)
-                
-                # Check if the user wants to stop the program
+
                 if "stop" in response:
                     SpeakText("Stopping the program.")
-                    print("Stopping the program.")
-                    exit()  # Exit the program immediately
-                
-                # Validation for tire pressure (only accept numbers)
+                    stop_response = json.dumps({"question": question, "response": "Process stopped by user."}) + "\n"
+                    print("Stopping the program:", stop_response.strip())
+                    yield stop_response
+                    stop_event.set()  # Set stop event
+                    return
+
                 if expected_type == "number":
                     try:
-                        pressure = float(response)
-                        return response
+                        float(response)
+                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                        print("Valid number response:", valid_response.strip())
+                        yield valid_response
+                        responses[question] = response  # Store the response
+                        return
                     except ValueError:
-                        SpeakText("Please provide a valid number for the tire pressure.")
-                        print("Please provide a valid number for the tire pressure.")
-                
-                # Validation for tire condition (only accept specific responses)
+                        SpeakText("Please provide a valid number.")
+                        continue
+
                 elif expected_type == "condition":
                     if response in ["good", "ok", "needs replacement"]:
-                        return response
+                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                        print("Valid condition response:", valid_response.strip())
+                        yield valid_response
+                        responses[question] = response  # Store the response
+                        return
                     else:
                         SpeakText("Please say Good, Ok, or Needs Replacement.")
-                        print("Please say Good, Ok, or Needs Replacement.")
-                
-                # No specific validation required
+                        continue
+
                 else:
-                    return response
+                    generic_response = json.dumps({"question": question, "response": response}) + "\n"
+                    print("Generic response:", generic_response.strip())
+                    yield generic_response
+                    responses[question] = response  # Store the response
+                    return
         except sr.RequestError as e:
-            print(f"Could not request results; {e}")
             SpeakText("There was an error with the request, please try again.")
         except sr.UnknownValueError:
-            print("Unknown error occurred, please say that again.")
             SpeakText("Sorry, I did not catch that. Please repeat.")
+
+def generate_responses():
+    global responses
+    global stop_event
+
+    stop_event.clear()  # Clear stop event at the start
+    all_questions = [question for section in questions.values() for question in section]
+
+    for i, q in enumerate(all_questions):
+        if stop_event.is_set():
+            break  # Stop processing if stop event is set
+
+        # Emit the question immediately
+        response_generator = ask_question(q['text'], q.get('type'))
+        for r in response_generator:
+            if stop_event.is_set():
+                stop_response = json.dumps({"question": q['text'], "response": "Process stopped by user."}) + "\n"
+                print("Stopping response:", stop_response.strip())
+                yield stop_response
+                break  # Break out of response loop if stop event is set
+            print("Generated response:", r.strip())
+            yield r
+        time.sleep(1)  # To simulate delay for real-time effect
+
+        # If it's the last question, stop the process automatically
+        if i == len(all_questions) - 1:
+            stop_event.set()  # Set stop event after the last question
+
+    # Print final responses after all questions are asked
+    print("Final Responses:")
+    for question, response in responses.items():
+        print(f"{question}: {response}")
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    response = Response(generate_responses(), content_type='application/json')
+    print("Request received for all sections.")
+    return response
+
+@app.route('/stop', methods=['POST'])
+def stop():
+    stop_event.set()  # Set stop event to signal stopping
+    stop_response = jsonify({"response": "Process stopping."})
+    print("Stop endpoint hit:", stop_response.get_data(as_text=True).strip())
+    return stop_response
 
 questions = {
     "Tires": [
@@ -108,20 +176,77 @@ questions = {
     ]
 }
 
-@app.route('/ask', methods=['POST'])
-def ask():
-    data = request.json
-    section = data['section']
-    
-    if section in questions:
-        section_questions = questions[section]
-        responses = []
-        for q in section_questions:
-            response = ask_question(q['text'], q.get('type'))
-            responses.append(response)
-        return jsonify({"response": " | ".join(responses)})
-    else:
-        return jsonify({"response": "Invalid section"})
+def ask_question(question, expected_type=None):
+    global stop_event
+    response_list = []
+
+    # Emit the question to the frontend immediately
+    question_response = json.dumps({"question": question, "response": ""}) + "\n"
+    print("Emitting question:", question_response.strip())
+    yield question_response
+
+    # Speak the question
+    SpeakText(question)
+
+    # Add a short delay to allow the TTS engine to finish
+    time.sleep(1.5)  # Adjust the duration if needed
+
+    while not stop_event.is_set():  # Check if stop event is set
+        try:
+            with sr.Microphone() as source2:
+                r.adjust_for_ambient_noise(source2, duration=0.2)
+                audio2 = r.listen(source2)
+                response = r.recognize_google(audio2).lower()
+
+                if "stop" in response:
+                    SpeakText("Stopping the program.")
+                    stop_response = json.dumps({"question": question, "response": "Process stopped by user."}) + "\n"
+                    print("Stopping the program:", stop_response.strip())
+                    yield stop_response
+                    stop_event.set()  # Set stop event
+                    return
+
+                if "skip"  in response:
+                    SpeakText("Skipping the question.")
+                    skip_response = json.dumps({"question": question, "response": "Question skipped by user."}) + "\n"
+                    print("Skipping the question:", skip_response.strip())
+                    yield skip_response
+                    return  # Skip to the next question
+
+                if expected_type == "number":
+                    try:
+                        float(response)
+                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                        print("Valid number response:", valid_response.strip())
+                        yield valid_response
+                        responses[question] = response  # Store the response
+                        return
+                    except ValueError:
+                        SpeakText("Please provide a valid number.")
+                        continue
+
+                elif expected_type == "condition":
+                    if response in ["good", "ok", "needs replacement"]:
+                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                        print("Valid condition response:", valid_response.strip())
+                        yield valid_response
+                        responses[question] = response  # Store the response
+                        return
+                    else:
+                        SpeakText("Please say Good, Ok, or Needs Replacement.")
+                        continue
+
+                else:
+                    generic_response = json.dumps({"question": question, "response": response}) + "\n"
+                    print("Generic response:", generic_response.strip())
+                    yield generic_response
+                    responses[question] = response  # Store the response
+                    return
+        except sr.RequestError as e:
+            SpeakText("There was an error with the request, please try again.")
+        except sr.UnknownValueError:
+            SpeakText("Sorry, I did not catch that. Please repeat.")
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,0 +1,105 @@
+/* General container styling */
+.chatbox-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #000000; /* Dark background for contrast */
+    height: 100vh;
+    color: #ffffff; /* Light text color for better readability */
+}
+  
+form {
+    margin-bottom: 20px;
+}
+  
+button {
+    padding: 12px 24px;
+    background-color: #ffea00;
+    color: #000000;
+    border: none;
+    border-radius: 25px; /* Rounded button */
+    cursor: pointer;
+    font-size: 18px;
+    transition: background-color 0.3s ease;
+}
+  
+button:disabled {
+    background-color: #444;
+    cursor: not-allowed;
+}
+  
+button:not(:disabled):hover {
+    background-color: #0056b3;
+}
+  
+/* Chatbox styling */
+.chatbox {
+    width: 90%;
+    max-width: 800px;
+    border: none;
+    border-radius: 20px; /* Curved edges */
+    background: #f0f0f0; /* Light yellow background for the chatbox */
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Softer shadow for depth */
+    overflow-y: auto; /* Add scrolling */
+}
+  
+/* Message styling */
+.chatbox-message {
+    display: flex;
+    margin-bottom: 15px;
+    word-wrap: break-word;
+}
+  
+.message-bubble {
+    padding: 12px;
+    border-radius: 20px; /* Curved message bubbles */
+    max-width: 70%;
+    line-height: 1.4;
+    font-size: 16px;
+    position: relative;
+}
+  
+.question {
+    background-color: #f7f7f7; /* Light background for question */
+    color: #333;
+    align-self: flex-start;
+    margin-right: auto;
+}
+  
+.response {
+    background-color: #ffeb3b; /* Yellow for response */
+    color: #333;
+    align-self: flex-end;
+    margin-left: auto;
+}
+  
+/* Bubble arrow */
+.message-bubble::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 10px solid transparent;
+}
+  
+.question::after {
+    border-right-color: #f7f7f7;
+    border-left: 10px solid transparent;
+    top: 50%;
+    left: -10px;
+    transform: translateY(-50%);
+}
+  
+.response::after {
+    border-left-color: #ffeb3b;
+    border-right: 10px solid transparent;
+    top: 50%;
+    right: -10px;
+    transform: translateY(-50%);
+}

@@ -5,6 +5,7 @@ require('dotenv').config();
 const bodyParser = require("body-parser");
 const Worker = require('./models/workersdb'); // Import Worker model
 const app = express();
+const { exec } = require('child_process');
 
 app.use(cors({
   origin: 'http://localhost:3000'
@@ -47,6 +48,30 @@ app.get('/api/workers/:employeeid', async (req, res) => {
     }
 });
    
+const customerRoutes = require('./routes/customerRoutes');
+app.use('/api/customers', customerRoutes);
+
+const inspectionRoutes = require('./routes/inspectionRoutes');
+// Use inspection routes
+app.use('/api/inspections', inspectionRoutes);
+
+app.get('/scan', (req, res) => {
+  exec('python scanner.py', (error, stdout, stderr) => {
+      if (error) {
+          console.error(`exec error: ${error}`);
+          res.status(500).json({ error: 'Failed to run scanner script' });
+          return;
+      }
+      if (stderr) {
+          console.error(`stderr: ${stderr}`);
+          res.status(500).json({ error: 'Scanner script error' });
+          return;
+      }
+      res.json({ qr_code_text: stdout.trim() });
+  });
+});
+
+
 app.listen(4000 , () => {
     console.log("Server running at port 4000");
 });

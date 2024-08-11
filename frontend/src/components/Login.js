@@ -24,14 +24,10 @@ function Login() {
       console.log(data);
 
       if (response.status === 200) {
-        // Fetch the employee details using the employeeId from the login response
-        //const employeeResponse = await fetch(`http://localhost:4000/api/workers/${data.employeeid}`);
-        //const employeeData = await employeeResponse.json();
-
         if (data.role === 'admin') {
           navigate('/admin/dashboard', { state: { email, employeeid: data.employeeid } });
         } else if (data.role === 'worker') {
-          navigate('/worker/dashboard', { state: { email, employeeid: data.employeeid } });
+          navigate('/scan', { state: { email, employeeid: data.employeeid } });
         }
       } else {
         setError(data.message || 'Login failed');
@@ -43,31 +39,36 @@ function Login() {
 
   return (
     <div className="login-container">
-      <form className="login-form" onSubmit={handleLogin}>
-        <img src="/images/catlogo.jpg" alt="CAT Logo" className="logo" />
-        <h2>Login</h2>
-        <hr />
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit">Login</button>
-      </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <div className="login-image">
+        <img src="/images/bigtruckcat.png" alt="Caterpillar Truck" />
+      </div>
+      <div className="login-form-container">
+        <form className="login-form" onSubmit={handleLogin}>
+          <img src='/images/catlogo.png' alt="CAT Logo" className="logo" />
+          <h2>Caterpillar Services</h2>
+          <p>Please enter your details</p>
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="login-button">Log In</button>
+        </form>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+      </div>
     </div>
   );
 }

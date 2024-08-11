@@ -1,60 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import './Worker.css'; // Import the CSS file for styling
 
-function Worker() {
-  const [section, setSection] = useState('Tires');
-  const [response, setResponse] = useState('');
-  const [log, setLog] = useState([]);
+function Worker({ customerid, truckSerialNumber, email, employeeid }) {
+  const [messages, setMessages] = useState([]); // Store messages as an array
+  const [isAsking, setIsAsking] = useState(false);
+  const chatboxRef = useRef(null); // Reference for auto-scrolling
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const res = await fetch('http://localhost:5000/ask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ section }),
+    setIsAsking(true);
+    setMessages([]); // Clear messages when starting a new inspection
+
+    // Prepare the request payload with additional values
+    const requestPayload = {
+      customerid,
+      truckSerialNumber,
+      email,
+      employeeid
+    };
+
+    const res = await fetch('http://127.0.0.1:5000/ask', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    let currentQuestionText = '';
+    let questionAnswered = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      lines.forEach(line => {
+        if (line) {
+          try {
+            const responsePart = JSON.parse(line);
+
+            if (responsePart.question && responsePart.question !== currentQuestionText) {
+              currentQuestionText = responsePart.question;
+              questionAnswered = false;
+
+              // Add new question to the messages array
+              setMessages(prevMessages => [
+                ...prevMessages,
+                { type: 'question', text: responsePart.question }
+              ]);
+            }
+
+            if (responsePart.response && !questionAnswered) {
+              // Add new response to the messages array
+              setMessages(prevMessages => [
+                ...prevMessages,
+                { type: 'response', text: responsePart.response }
+              ]);
+              questionAnswered = true;
+
+              // Check if the response indicates the end of the inspection
+              if (responsePart.response === "Process stopped by user.") {
+                setIsAsking(false);
+                return;
+              }
+            }
+          } catch (e) {
+            // Ignore parsing errors for incomplete JSON strings
+          }
+        }
       });
-      const data = await res.json();
-      setResponse(data.response);
-      setLog([...log, { section, response: data.response }]);
-    } catch (error) {
-      console.error("Error connecting to the API:", error);
     }
   };
 
+  useEffect(() => {
+    if (chatboxRef.current) {
+      chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   return (
-    <div className="App">
+    <div className="chatbox-container">
       <h1>Vehicle Inspection</h1>
       <form onSubmit={handleSubmit}>
-        <label>
-          Section:
-          <select value={section} onChange={(e) => setSection(e.target.value)}>
-            <option value="Tires">Tires</option>
-            <option value="Battery">Battery</option>
-            <option value="Exterior">Exterior</option>
-            <option value="Brakes">Brakes</option>
-            <option value="Engine">Engine</option>
-            <option value="Voice of Customer">Voice of Customer</option>
-          </select>
-        </label>
-        <button type="submit">Start Inspection</button>
+        <button type="submit" disabled={isAsking}>
+          {isAsking ? "Asking..." : "Start Inspection"}
+        </button>
       </form>
-      {response && (
-        <div>
-          <h2>Response:</h2>
-          <p>{response}</p>
-        </div>
-      )}
-      <div>
-        <h2>Inspection Log:</h2>
-        <ul>
-          {log.map((entry, index) => (
-            <li key={index}>
-              <strong>{entry.section}</strong>: {entry.response}
-            </li>
-          ))}
-        </ul>
+      <div className="chatbox" ref={chatboxRef}>
+        {messages.map((message, index) => (
+          <div key={index} className={`chatbox-message ${message.type}`}>
+            <div className="message-bubble">{message.text}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

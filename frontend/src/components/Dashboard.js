@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import './Dashboard.css';
 import Admin from './Admin';
+import AddCustomer from './AddCustomer'; // Import AddCustomer component
 
 function Dashboard() {
   const [view, setView] = useState('overview');
@@ -33,6 +34,7 @@ function Dashboard() {
         <h3>Admin Dashboard</h3>
         <button className="sidebar-btn" onClick={() => handleClick('overview')}>Employee Details</button>
         <button className="sidebar-btn" onClick={() => handleClick('newEmployee')}>New Employee</button>
+        <button className="sidebar-btn" onClick={() => handleClick('addCustomer')}>Add Customer</button> {/* Added button for Add Customer */}
         <button className="sidebar-btn" onClick={handleLogout}>Logout</button> {/* Added logout handler */}
       </div>
       <div className="main-content">
@@ -146,6 +148,7 @@ function Dashboard() {
           </>
         )}
         {view === 'newEmployee' && <Admin />}
+        {view === 'addCustomer' && <AddCustomer />} {/* Conditionally render AddCustomer component */}
       </div>
     </div>
   );
