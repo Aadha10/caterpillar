@@ -1,18 +1,31 @@
 /* General container for the QR scanner component */
-.qrscanner-container {
+.body {
+    background-image: "catimg.jpg";
+  }
+  
+  .qrscanner-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 20px;
-    font-family: 'Arial', sans-serif;
+    font-family: "Arial", sans-serif;
     background-color: #f0f2f5;
     min-height: 100vh;
-}
-
-/* Style for the scan button */
-.scan-button {
-    background-color: #007bff;
-    color: white;
+  }
+  .qrscanner-container {
+    background-image: url("C:\Users\daadh\OneDrive\Desktop\Caterpillar1\frontend\public\images\catimg.jpg");
+    background-size: cover; /* This makes the image cover the entire container */
+    background-position: center; /* Centers the image */
+    background-repeat: no-repeat; /* Prevents the image from repeating */
+    height: 100vh; /* Ensures the container takes up the full height of the viewport */
+    width: 100vw; /* Optional: Ensures the container takes up the full width of the viewport */
+  }
+  
+  /* Style for the scan button */
+  .scan-button {
+    background-color: #ffcd11;
+    color: black;
+    font-weight: 700;
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -20,62 +33,67 @@
     cursor: pointer;
     transition: background-color 0.3s, transform 0.2s;
     margin-bottom: 20px;
-}
-
-.scan-button:hover {
-    background-color: #0056b3;
+    width: 50vh;
+  }
+  
+  .scan-button:hover {
+    background-color: darkgoldenrod;
     transform: scale(1.05);
-}
-
-/* Container for displaying information */
-.info-container {
+  }
+  
+  /* Container for displaying information */
+  .info-container {
     width: 100%;
-    max-width: 600px;
-    padding: 20px;
+    max-width: 800px;
+    height: 250px;
+    border: 30px;
+    padding: 50px;
     background-color: #ffffff;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Style for individual information sections */
-.info-section {
+    opacity: 0.8;
+  }
+  
+  /* Style for individual information sections */
+  .info-section {
     margin-bottom: 20px;
-}
-
-.info-section h3 {
+  }
+  
+  .info-section h3 {
     margin-bottom: 10px;
     color: #333;
-}
-
-.info-section p {
+  }
+  
+  .info-section p {
     font-size: 16px;
     color: #555;
-}
-
-/* Style for scanned text display */
-.info-section pre {
+  }
+  
+  /* Style for scanned text display */
+  .info-section pre {
     background-color: #e9ecef;
     padding: 15px;
     border-radius: 5px;
     overflow: auto;
-}
-
-/* Style for error messages */
-.error {
+  }
+  
+  /* Style for error messages */
+  .error {
     color: #dc3545;
-}
-
-/* Style for navigation buttons */
-.navigation-buttons {
+  }
+  
+  /* Style for navigation buttons */
+  .navigation-buttons {
     display: flex;
     justify-content: space-between;
     gap: 20px;
     margin-top: 20px;
-}
-
-.nav-button {
-    background-color: #28a745;
-    color: white;
+  }
+  
+  .nav-button {
+    background-color: #ffcd11;
+    color: balck;
+    font-weight: 600;
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -84,9 +102,9 @@
     transition: background-color 0.3s, transform 0.2s;
     flex: 1;
     margin: 0 10px;
-}
-
-.nav-button:hover {
-    background-color: #218838;
+  }
+  
+  .nav-button:hover {
+    background-color: black;
     transform: scale(1.05);
-}
+  }

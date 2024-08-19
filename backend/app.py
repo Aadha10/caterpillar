@@ -1,133 +1,28 @@
-from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
-import speech_recognition as sr
-import pyttsx3
-import json
 import time
-from threading import Event
+import threading
+import json
+import speech_recognition as sr
+import pymongo
+import subprocess
+from flask import Flask, Response, jsonify
+from pymongo import MongoClient
+from flask_cors import CORS
+import os
 
 app = Flask(__name__)
 CORS(app)
 
+# Initialize MongoDB client and connect to the database
+client = MongoClient(os.getenv('Mongo'))
+db = client['test']
+collection = db['inspection']
+
+# Initialize global variables
+stop_event = threading.Event()
+responses = {}
 r = sr.Recognizer()
 
-responses = {}
-stop_event = Event()  # Event to signal stop
-
-def SpeakText(command):
-    engine = pyttsx3.init()
-    engine.say(command)
-    engine.runAndWait()
-
-def ask_question(question, expected_type=None):
-    global stop_event
-    response_list = []
-
-    # Emit the question to the frontend immediately
-    question_response = json.dumps({"question": question, "response": ""}) + "\n"
-    print("Emitting question:", question_response.strip())
-    yield question_response
-
-    # Speak the question
-    SpeakText(question)
-
-    # Add a short delay to allow the TTS engine to finish
-    time.sleep(1.5)  # Adjust the duration if needed
-
-    while not stop_event.is_set():  # Check if stop event is set
-        try:
-            with sr.Microphone() as source2:
-                r.adjust_for_ambient_noise(source2, duration=0.2)
-                audio2 = r.listen(source2)
-                response = r.recognize_google(audio2).lower()
-
-                if "stop" in response:
-                    SpeakText("Stopping the program.")
-                    stop_response = json.dumps({"question": question, "response": "Process stopped by user."}) + "\n"
-                    print("Stopping the program:", stop_response.strip())
-                    yield stop_response
-                    stop_event.set()  # Set stop event
-                    return
-
-                if expected_type == "number":
-                    try:
-                        float(response)
-                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
-                        print("Valid number response:", valid_response.strip())
-                        yield valid_response
-                        responses[question] = response  # Store the response
-                        return
-                    except ValueError:
-                        SpeakText("Please provide a valid number.")
-                        continue
-
-                elif expected_type == "condition":
-                    if response in ["good", "ok", "needs replacement"]:
-                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
-                        print("Valid condition response:", valid_response.strip())
-                        yield valid_response
-                        responses[question] = response  # Store the response
-                        return
-                    else:
-                        SpeakText("Please say Good, Ok, or Needs Replacement.")
-                        continue
-
-                else:
-                    generic_response = json.dumps({"question": question, "response": response}) + "\n"
-                    print("Generic response:", generic_response.strip())
-                    yield generic_response
-                    responses[question] = response  # Store the response
-                    return
-        except sr.RequestError as e:
-            SpeakText("There was an error with the request, please try again.")
-        except sr.UnknownValueError:
-            SpeakText("Sorry, I did not catch that. Please repeat.")
-
-def generate_responses():
-    global responses
-    global stop_event
-
-    stop_event.clear()  # Clear stop event at the start
-    all_questions = [question for section in questions.values() for question in section]
-
-    for i, q in enumerate(all_questions):
-        if stop_event.is_set():
-            break  # Stop processing if stop event is set
-
-        # Emit the question immediately
-        response_generator = ask_question(q['text'], q.get('type'))
-        for r in response_generator:
-            if stop_event.is_set():
-                stop_response = json.dumps({"question": q['text'], "response": "Process stopped by user."}) + "\n"
-                print("Stopping response:", stop_response.strip())
-                yield stop_response
-                break  # Break out of response loop if stop event is set
-            print("Generated response:", r.strip())
-            yield r
-        time.sleep(1)  # To simulate delay for real-time effect
-
-        # If it's the last question, stop the process automatically
-        if i == len(all_questions) - 1:
-            stop_event.set()  # Set stop event after the last question
-
-    # Print final responses after all questions are asked
-    print("Final Responses:")
-    for question, response in responses.items():
-        print(f"{question}: {response}")
-
-@app.route('/ask', methods=['POST'])
-def ask():
-    response = Response(generate_responses(), content_type='application/json')
-    print("Request received for all sections.")
-    return response
-
-@app.route('/stop', methods=['POST'])
-def stop():
-    stop_event.set()  # Set stop event to signal stopping
-    stop_response = jsonify({"response": "Process stopping."})
-    print("Stop endpoint hit:", stop_response.get_data(as_text=True).strip())
-    return stop_response
-
+# Sample questions (you can adjust this according to your needs)
 questions = {
     "Tires": [
         {"text": "Tire Pressure for Left Front", "type": "number"},
@@ -176,8 +71,26 @@ questions = {
     ]
 }
 
+def SpeakText(command):
+    # This function uses a TTS engine to speak the text
+    # Implement TTS functionality according to your requirements
+    print(f"Speaking: {command}")
+
+def store_responses_to_db():
+    global responses
+    # Prepare the document to be stored in MongoDB
+    document = {
+        "responses": responses,
+        "timestamp": time.time()
+    }
+    print("Storing responses to DB:", document)  # Debugging output
+    result = collection.insert_one(document)
+    print(f"Stored responses with id: {result.inserted_id}")
+
 def ask_question(question, expected_type=None):
     global stop_event
+    global responses
+
     response_list = []
 
     # Emit the question to the frontend immediately
@@ -206,47 +119,64 @@ def ask_question(question, expected_type=None):
                     stop_event.set()  # Set stop event
                     return
 
-                if "skip"  in response:
-                    SpeakText("Skipping the question.")
+                # Check for "skip" keyword or process valid responses
+                if "skip" in response:
+                    response_list.append("Question skipped by user.")
                     skip_response = json.dumps({"question": question, "response": "Question skipped by user."}) + "\n"
                     print("Skipping the question:", skip_response.strip())
                     yield skip_response
-                    return  # Skip to the next question
+                    break
 
-                if expected_type == "number":
-                    try:
-                        float(response)
-                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
-                        print("Valid number response:", valid_response.strip())
-                        yield valid_response
-                        responses[question] = response  # Store the response
-                        return
-                    except ValueError:
-                        SpeakText("Please provide a valid number.")
-                        continue
+                if expected_type == "number" and response.isdigit():
+                    response_list.append(response)
+                    valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                    print("Valid number response:", valid_response.strip())
+                    yield valid_response
+                    break
+                elif expected_type == "text":
+                    response_list.append(response)
+                    valid_response = json.dumps({"question": question, "response": response}) + "\n"
+                    print("Valid text response:", valid_response.strip())
+                    yield valid_response
+                    break
 
-                elif expected_type == "condition":
-                    if response in ["good", "ok", "needs replacement"]:
-                        valid_response = json.dumps({"question": question, "response": response}) + "\n"
-                        print("Valid condition response:", valid_response.strip())
-                        yield valid_response
-                        responses[question] = response  # Store the response
-                        return
-                    else:
-                        SpeakText("Please say Good, Ok, or Needs Replacement.")
-                        continue
-
-                else:
-                    generic_response = json.dumps({"question": question, "response": response}) + "\n"
-                    print("Generic response:", generic_response.strip())
-                    yield generic_response
-                    responses[question] = response  # Store the response
-                    return
         except sr.RequestError as e:
             SpeakText("There was an error with the request, please try again.")
         except sr.UnknownValueError:
             SpeakText("Sorry, I did not catch that. Please repeat.")
 
+    responses[question] = response_list
 
-if __name__ == "__main__":
+def generate_responses():
+    global responses
+    global stop_event
+
+    stop_event.clear()  # Clear stop event at the start
+    responses = {}  # Clear previous responses
+    all_questions = [question for section in questions.values() for question in section]
+
+    for i, q in enumerate(all_questions):
+        if stop_event.is_set():
+            store_responses_to_db()  # Save responses when stopped
+            break  # Stop processing if stop event is set
+
+        # Emit the question immediately
+        response_generator = ask_question(q['text'], q.get('type'))
+        for r in response_generator:
+            if stop_event.is_set():
+                store_responses_to_db()  # Save responses when stopped
+                return  # Return to avoid saving twice
+            yield r
+        time.sleep(1)  # To simulate delay for real-time effect
+
+    # Save responses when the last question is processed
+    if not stop_event.is_set():
+        store_responses_to_db()
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    return Response(generate_responses(), content_type='application/json')
+
+if __name__ == '__main__':
     app.run(debug=True)
+    app.run(port=4000)
